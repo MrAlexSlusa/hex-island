@@ -306,13 +306,20 @@ Opening it in the browser is enough to play. To get a home-screen icon instead
 of a browser tab, use **Add to Home Screen** — Share menu on iOS Safari, the
 ⋮ menu on Android Chrome. `public/manifest.webmanifest` then takes over:
 `display: standalone` drops the browser chrome, and the service worker caches
-the shell and the art so a second opening works with no signal. Saved games were
-already local — `localStorage`, not a server — so nothing about them changes.
+the game so later openings work with no signal. Saved games were already local
+— `localStorage`, not a server — so nothing about them changes.
 
-Two things to know about that:
+Three things to know about that:
 
 - The service worker is only registered in a production build. In dev it would
   sit in front of Vite's module server and hand back stale code.
+- Caching takes two passes. `sw.js` precaches the shell when it installs, but
+  it cannot know Vite's hashed bundle names, and on a first visit it only takes
+  control *after* the bundle and the art have already gone past it to the
+  network. So once the art has loaded the page posts the worker the list of
+  files it actually fetched, and the worker stores whatever it is missing.
+  Without that, installing and immediately going offline would find the shell
+  cached with nothing to run in it.
 - `vite.config.ts` sets `base: './'`, so every path in the build is relative.
   That is what lets the same `dist/` work at a domain root *and* under a Pages
   project subpath (`user.github.io/hex-island/`), which is also what scopes the

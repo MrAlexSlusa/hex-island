@@ -67,7 +67,6 @@ const menu = setupMenu({
 });
 
 showScreen('menu');
-void ensureAssets();
 
 /**
  * Installed-app support. Only in a real build: in dev a worker would sit in
@@ -84,3 +83,28 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       .catch(() => toast('Offline play unavailable'));
   });
 }
+
+/**
+ * Tells the worker which files this visit actually used, so the next one works
+ * with no signal.
+ *
+ * The worker precaches the shell when it installs, but it cannot know the
+ * hashed bundle names, and on a first visit it only takes control after the
+ * bundle and the art pack have already gone past it to the network.
+ */
+function cacheForOffline() {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  const send = () => {
+    navigator.serviceWorker.controller?.postMessage({
+      type: 'precache',
+      urls: performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((url) => url.startsWith(`${location.origin}/`)),
+    });
+  };
+  if (navigator.serviceWorker.controller) send();
+  else navigator.serviceWorker.addEventListener('controllerchange', send, { once: true });
+}
+
+void ensureAssets().then(cacheForOffline);

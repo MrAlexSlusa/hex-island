@@ -45,6 +45,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/**
+ * The page tells us what it actually loaded once it is up and running, which
+ * is the only way to learn the hashed bundle names and which art the board
+ * asked for. Without this, a first visit followed straight by going offline
+ * would find the shell cached but nothing to run in it.
+ */
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'precache' || !Array.isArray(data.urls)) return;
+
+  event.waitUntil(
+    caches.open(VERSION).then(async (cache) => {
+      const held = new Set((await cache.keys()).map((request) => request.url));
+      const missing = data.urls.filter(
+        (url) => typeof url === 'string' && !held.has(url) && url.startsWith(self.registration.scope),
+      );
+      await Promise.allSettled(missing.map((url) => cache.add(url)));
+    }),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
