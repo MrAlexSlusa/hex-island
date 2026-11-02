@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover lets the page reach under a phone's notch; the CSS
+         then pads the edges back with env(safe-area-inset-*). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Hex Island</title>
+    <meta
+      name="description"
+      content="Hex Island - a hexagonal island of settlers, roads and trade. A personal fan project."
+    />
+
+    <!-- Installed as a home-screen app. Paths stay relative so the same build
+         works at a domain root or under a GitHub Pages project subpath. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta name="theme-color" content="#072241" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Hex Island" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ---------------------------------------------------------- -->
+      <section class="screen screen-menu" id="screen-menu">
+        <div class="menu-inner">
+          <h1 class="logo">HEX ISLAND</h1>
+          <p class="tagline">Build &middot; Trade &middot; Settle</p>
+          <div class="menu-art" id="menu-art"></div>
+          <div class="menu-buttons">
+            <button class="btn btn-primary btn-xl" id="btn-new-game">Play vs bots</button>
+            <button class="btn btn-secondary btn-xl" id="btn-continue">Continue saved game</button>
+            <button class="btn btn-ghost btn-xl" id="btn-how-to">How to play</button>
+          </div>
+          <p class="footnote">
+            A personal fan project. Not affiliated with, or endorsed by, any board game publisher.
+          </p>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- -->
+      <section class="screen screen-new hidden" id="screen-new">
+        <div class="panel setup-panel">
+          <h2>New game</h2>
+
+          <div class="field">
+            <label for="input-name">Your name</label>
+            <input id="input-name" type="text" maxlength="14" value="You" />
+          </div>
+
+          <div class="field">
+            <span class="field-label">Your colour</span>
+            <div class="colour-row" id="colour-row"></div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Opponents</span>
+            <div class="seg" id="bot-count">
+              <button class="seg-btn" data-count="1">1</button>
+              <button class="seg-btn is-active" data-count="2">2</button>
+              <button class="seg-btn" data-count="3">3</button>
+              <button class="seg-btn" data-count="4">4</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Difficulty, per opponent</span>
+            <div id="bot-list" class="bot-list"></div>
+          </div>
+
+          <div class="setup-actions">
+            <button class="btn btn-ghost" id="btn-back-menu">Back</button>
+            <button class="btn btn-primary" id="btn-start">Start game</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- -->
+      <section class="screen screen-game hidden" id="screen-game">
+        <header class="topbar">
+          <button class="btn btn-ghost btn-sm" id="btn-to-menu">&#8592; Menu</button>
+          <div class="banner" id="banner">Your turn</div>
+          <div class="topbar-right">
+            <span class="turn-clock" id="turn-clock">0:00</span>
+            <button class="btn btn-ghost btn-sm" id="btn-save">Save</button>
+          </div>
+        </header>
+
+        <main class="board-area">
+          <canvas id="board"></canvas>
+          <div class="board-hint" id="board-hint"></div>
+        </main>
+
+        <aside class="sidebar">
+          <div class="players" id="players"></div>
+          <div class="log-wrap">
+            <h3 class="section-title">Activity</h3>
+            <ol class="log" id="log"></ol>
+          </div>
+        </aside>
+
+        <footer class="actionbar">
+          <div class="dice-tray" id="dice-tray"></div>
+          <div class="controls" id="controls"></div>
+          <div class="hand-wrap">
+            <div class="hand-head">
+              <span class="section-title">Your hand</span>
+              <span class="hand-count" id="hand-count"></span>
+            </div>
+            <div class="hand" id="hand"></div>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="fly-layer" aria-hidden="true"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

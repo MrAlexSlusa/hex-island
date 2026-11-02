@@ -1,0 +1,22 @@
+{
+  "name": "hex-island",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Hex Island - a hexagonal island trading & building board game. Personal fan project.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "art": "node tools/art.mjs",
+    "icons": "node tools/icons.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}
