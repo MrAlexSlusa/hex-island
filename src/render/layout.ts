@@ -32,6 +32,10 @@ export interface Point {
 const VERTEX_GRAB = { mouse: 0.42, finger: 0.62 };
 const EDGE_GRAB = { mouse: 0.3, finger: 0.52 };
 
+/** How far in and out the board may be zoomed, on top of the fitted scale. */
+export const MIN_ZOOM = 0.75;
+export const MAX_ZOOM = 2.2;
+
 export class Layout {
   size = 60;
   originX = 0;
@@ -42,11 +46,16 @@ export class Layout {
   panY = 0;
   /** Whether a finger, rather than a mouse or pen, is driving the board. */
   coarsePointer = false;
+  /** Canvas size the last `fit` was made for, which `zoomAround` works from. */
+  private viewWidth = 0;
+  private viewHeight = 0;
 
   constructor(private board: Board) {}
 
   /** Recomputes the scale so the whole island (ocean ring included) fits. */
   fit(width: number, height: number, padding = 12) {
+    this.viewWidth = width;
+    this.viewHeight = height;
     const unit = boardExtent(this.board, 1);
     const scaleX = (width - padding * 2) / unit.width;
     const scaleY = (height - padding * 2) / unit.height;
@@ -55,6 +64,34 @@ export class Layout {
     const extent = boardExtent(this.board, this.size);
     this.originX = width / 2 - (extent.minX + extent.maxX) / 2 + this.panX;
     this.originY = height / 2 - (extent.minY + extent.maxY) / 2 + this.panY;
+  }
+
+  /**
+   * Multiplies the zoom about a point on the canvas, so whatever sits under
+   * the cursor — or between two fingers — stays put while the board grows.
+   *
+   * `fit` rebuilds the origin from the zoom every frame and only the pan
+   * survives, so holding a point still means moving the pan by the difference.
+   * For a scale change of `r` about a focus `f` measured from the canvas
+   * centre, that works out at `f(1 - r) + r·pan`.
+   *
+   * The focus is in canvas coordinates, the same ones `pickVertex` and friends
+   * take.
+   */
+  zoomAround(factor: number, focusX: number, focusY: number) {
+    const before = this.zoom;
+    this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, before * factor));
+    // Not the factor asked for, once the clamp has had its say.
+    const applied = this.zoom / before;
+    this.panX = (focusX - this.viewWidth / 2) * (1 - applied) + applied * this.panX;
+    this.panY = (focusY - this.viewHeight / 2) * (1 - applied) + applied * this.panY;
+
+    // Zoomed right back out the whole island is on screen, so a leftover pan
+    // would only hold it off-centre.
+    if (this.zoom <= MIN_ZOOM + 0.03) {
+      this.panX = 0;
+      this.panY = 0;
+    }
   }
 
   hexCenter(id: HexId): Point {

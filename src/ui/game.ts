@@ -145,8 +145,14 @@ export class GameScreen {
   }
 
   private wirePointer() {
+    /** Every finger or button currently down on the board, by pointer id. */
+    const active = new Map<number, { x: number; y: number }>();
     let downAt: { x: number; y: number } | null = null;
     let panning = false;
+    /** The gap and midpoint between two fingers, while there are two. */
+    let pinch: { gap: number; x: number; y: number } | null = null;
+    /** A pinch lets go one finger at a time; no lift of it may read as a tap. */
+    let tapDead = false;
 
     /**
      * Widens the board's grab radius while a finger is on it. A pen is as
@@ -158,15 +164,54 @@ export class GameScreen {
       this.renderer.layout.coarsePointer = event.pointerType === 'touch';
     };
 
+    /** The gap and midpoint of the first two pointers still down. */
+    const spanOfTwo = () => {
+      const [a, b] = [...active.values()];
+      return { gap: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+
     this.canvas.addEventListener('pointerdown', (event) => {
       notePointer(event);
-      downAt = { x: event.clientX, y: event.clientY };
-      panning = false;
+      active.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      // A second finger turns whatever was happening into a pinch.
+      if (active.size === 2) {
+        pinch = spanOfTwo();
+        tapDead = true;
+        downAt = null;
+        panning = false;
+      } else {
+        downAt = { x: event.clientX, y: event.clientY };
+        panning = false;
+      }
+
+      // Last, so that nothing it throws can skip the bookkeeping above.
       this.canvas.setPointerCapture(event.pointerId);
     });
 
     this.canvas.addEventListener('pointermove', (event) => {
       notePointer(event);
+      const held = active.get(event.pointerId);
+      const from = held ? { x: held.x, y: held.y } : null;
+      if (held) {
+        held.x = event.clientX;
+        held.y = event.clientY;
+      }
+
+      if (pinch && active.size >= 2) {
+        const now = spanOfTwo();
+        const focus = this.renderer.toCanvas(now.x, now.y);
+        // Two fingers never quite land on the same spot, but nothing stops a
+        // synthetic event from doing so, and that would divide by zero.
+        if (pinch.gap > 0) this.renderer.layout.zoomAround(now.gap / pinch.gap, focus.x, focus.y);
+        // Fingers moving together pan, which is exactly what their midpoint does.
+        this.renderer.layout.panX += now.x - pinch.x;
+        this.renderer.layout.panY += now.y - pinch.y;
+        pinch = now;
+        this.renderer.resize();
+        return;
+      }
+
       const point = this.renderer.toCanvas(event.clientX, event.clientY);
 
       if (downAt) {
@@ -177,8 +222,10 @@ export class GameScreen {
         const slop = event.pointerType === 'touch' ? 14 : 6;
         if (panning || Math.hypot(dx, dy) > slop) {
           panning = true;
-          this.renderer.layout.panX += event.movementX;
-          this.renderer.layout.panY += event.movementY;
+          // Measured from the tracked position rather than event.movementX,
+          // which older Safari leaves unset for touch pointers.
+          this.renderer.layout.panX += event.clientX - (from?.x ?? event.clientX);
+          this.renderer.layout.panY += event.clientY - (from?.y ?? event.clientY);
           this.renderer.resize();
           return;
         }
@@ -202,15 +249,39 @@ export class GameScreen {
       this.canvas.style.cursor = hot ? 'pointer' : hints.mode === 'none' ? 'grab' : 'default';
     });
 
-    this.canvas.addEventListener('pointerup', (event) => {
-      notePointer(event);
-      this.canvas.releasePointerCapture(event.pointerId);
-      const wasPan = panning;
+    /** Drops a pointer, and settles what the remaining ones mean. */
+    const release = (event: PointerEvent) => {
+      active.delete(event.pointerId);
+      if (this.canvas.hasPointerCapture(event.pointerId)) {
+        this.canvas.releasePointerCapture(event.pointerId);
+      }
+      if (pinch && active.size < 2) {
+        pinch = null;
+        // A finger still on the board carries on as a pan, never as a tap.
+        const [rest] = [...active.values()];
+        if (rest) {
+          downAt = { x: rest.x, y: rest.y };
+          panning = true;
+        }
+      }
+      if (active.size > 0) return;
       downAt = null;
       panning = false;
-      if (wasPan) return;
+      tapDead = false;
+    };
+
+    this.canvas.addEventListener('pointerup', (event) => {
+      notePointer(event);
+      const wasPan = panning;
+      const wasDead = tapDead;
+      release(event);
+      if (wasPan || wasDead) return;
       const point = this.renderer.toCanvas(event.clientX, event.clientY);
       void this.handleClick(point.x, point.y);
+    });
+
+    this.canvas.addEventListener('pointercancel', (event) => {
+      release(event);
     });
 
     this.canvas.addEventListener('pointerleave', () => {
@@ -223,12 +294,10 @@ export class GameScreen {
       'wheel',
       (event) => {
         event.preventDefault();
-        const layout = this.renderer.layout;
-        layout.zoom = Math.max(0.75, Math.min(2.2, layout.zoom * (event.deltaY > 0 ? 0.92 : 1.08)));
-        if (layout.zoom <= 0.78) {
-          layout.panX = 0;
-          layout.panY = 0;
-        }
+        // Same path as a pinch, so the wheel now zooms towards the cursor
+        // rather than the middle of the board.
+        const point = this.renderer.toCanvas(event.clientX, event.clientY);
+        this.renderer.layout.zoomAround(event.deltaY > 0 ? 0.92 : 1.08, point.x, point.y);
         this.renderer.resize();
       },
       { passive: false },

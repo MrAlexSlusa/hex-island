@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createBoard } from '../src/game/board';
 import { Rng } from '../src/game/rng';
-import { Layout } from '../src/render/layout';
+import { Layout, MAX_ZOOM, MIN_ZOOM } from '../src/render/layout';
 
 /**
  * A layout at a round scale with no offset, so a distance in pixels is just a
@@ -82,5 +82,80 @@ describe('hit-testing a road', () => {
   it('still ignores a tap that is nowhere near', () => {
     expect(pickAt(60, false)).toBeNull();
     expect(pickAt(60, true)).toBeNull();
+  });
+});
+
+describe('zooming about a point', () => {
+  /** A layout fitted to a viewport, the state `zoomAround` expects. */
+  function fitted() {
+    const { board, layout } = layoutAtSize();
+    layout.fit(800, 600);
+    return { board, layout, refit: () => layout.fit(800, 600) };
+  }
+
+  it('keeps whatever is under the focus under it', () => {
+    const { board, layout, refit } = fitted();
+    const [id] = Object.keys(board.vertices);
+    // Somewhere off-centre, where a mistake in the pan maths would show.
+    const focus = layout.vertex(id);
+
+    layout.zoomAround(1.5, focus.x, focus.y);
+    refit();
+
+    const after = layout.vertex(id);
+    expect(after.x).toBeCloseTo(focus.x, 6);
+    expect(after.y).toBeCloseTo(focus.y, 6);
+  });
+
+  it('holds the focus through a pinch applied in many small steps', () => {
+    const { board, layout, refit } = fitted();
+    const [id] = Object.keys(board.vertices);
+    const focus = layout.vertex(id);
+
+    // A real pinch arrives as a stream of tiny factors, not one big one.
+    for (let i = 0; i < 20; i++) {
+      layout.zoomAround(1.03, focus.x, focus.y);
+      refit();
+    }
+
+    const after = layout.vertex(id);
+    expect(after.x).toBeCloseTo(focus.x, 6);
+    expect(after.y).toBeCloseTo(focus.y, 6);
+  });
+
+  it('stops at the zoom limits', () => {
+    const { layout } = fitted();
+    for (let i = 0; i < 60; i++) layout.zoomAround(1.2, 700, 500);
+    expect(layout.zoom).toBe(MAX_ZOOM);
+
+    for (let i = 0; i < 60; i++) layout.zoomAround(0.8, 700, 500);
+    expect(layout.zoom).toBe(MIN_ZOOM);
+  });
+
+  it('does not drift once it is already at the limit', () => {
+    const { board, layout, refit } = fitted();
+    for (let i = 0; i < 60; i++) {
+      layout.zoomAround(1.2, 700, 500);
+      refit();
+    }
+    const [id] = Object.keys(board.vertices);
+    const settled = layout.vertex(id);
+
+    // Pinching further open must be a no-op, not a slow slide.
+    layout.zoomAround(1.2, 700, 500);
+    refit();
+
+    expect(layout.vertex(id)).toEqual(settled);
+  });
+
+  it('recentres the board once it is zoomed right back out', () => {
+    const { layout } = fitted();
+    layout.zoomAround(2, 700, 500);
+    expect(layout.panX === 0 && layout.panY === 0).toBe(false);
+
+    for (let i = 0; i < 60; i++) layout.zoomAround(0.8, 700, 500);
+    expect(layout.zoom).toBe(MIN_ZOOM);
+    expect(layout.panX).toBe(0);
+    expect(layout.panY).toBe(0);
   });
 });

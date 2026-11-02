@@ -285,15 +285,18 @@ The suite covers the rules engine rather than the UI:
   table) played to a winner with no rule violations, Hard beating Easy over
   repeated games, and determinism for a given seed.
 - **layout** — the one piece of render code that is pure enough to test: the
-  grab radii, that a fingertip is forgiven a near-miss a cursor is not, and
-  that neither pointer can click the middle of a tile.
+  grab radii, that a fingertip is forgiven a near-miss a cursor is not, that
+  neither pointer can click the middle of a tile, and that zooming holds its
+  focus — through one big step, through twenty small ones the way a real
+  pinch arrives, and at both ends of the zoom range.
 
 ---
 
 ## Controls
 
 - **Click** a highlighted corner or edge to place; **Esc** cancels a build mode.
-- **Drag** the board to pan, **scroll** to zoom.
+- **Drag** the board to pan, **scroll** to zoom towards the cursor.
+- On a touchscreen, **pinch** to zoom and **drag with two fingers** to pan.
 - **Save** stores the game in `localStorage`; **Continue saved game** on the main
   menu restores it. The game also auto-saves during your turn.
 
@@ -318,6 +321,20 @@ the wider radius cannot jump a corner or make the middle of a tile clickable.
 Which radius applies follows the pointer actually in use (`event.pointerType`),
 not the device, so a hybrid machine switching between mouse and touchscreen
 mid-game gets the right one each time, and a pen counts as precise.
+
+Pinching zooms, and two fingers dragging together pan. Every pointer currently
+down is tracked by id, and a second one arriving turns whatever was happening
+into a pinch; the zoom follows the gap between the fingers and the pan follows
+their midpoint. A pinch ends one finger at a time, so both lifts are barred
+from registering as a tap, and if one finger stays down it continues as a pan.
+`Layout.zoomAround` does the anchoring: because `fit` rebuilds the origin from
+the zoom each frame and only the pan survives, holding a point under the
+fingers means moving the pan by `f(1 - r) + r·pan`, for a scale change `r`
+about a focus `f` from the canvas centre. The wheel goes through the same
+call, so it now zooms towards the cursor rather than the middle of the board.
+
+One-finger panning measures its delta from the tracked position rather than
+`event.movementX`, which older Safari leaves unset for touch pointers.
 
 Opening it in the browser is enough to play. To get a home-screen icon instead
 of a browser tab, use **Add to Home Screen** — Share menu on iOS Safari, the
