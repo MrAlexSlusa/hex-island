@@ -13,6 +13,25 @@ export interface Point {
   y: number;
 }
 
+/**
+ * How far a click may land from a target and still count, as a fraction of the
+ * hex circumradius.
+ *
+ * Every pick is handed the legal spots and returns the nearest of them, so a
+ * wider catchment never changes which spot wins — it only decides how far off
+ * the mark a click may be before it is ignored altogether. That is what makes
+ * it safe to be generous with a fingertip, which covers far more of the screen
+ * than a mouse cursor does.
+ *
+ * Corners sit one circumradius apart, so anything below 0.5 keeps a tap inside
+ * a corner's own half of that gap; 0.62 lets it stray a little past the
+ * halfway mark without ever being able to jump a whole corner. A hex centre is
+ * a full radius from every one of its corners, so tapping the middle of a tile
+ * still does nothing either way.
+ */
+const VERTEX_GRAB = { mouse: 0.42, finger: 0.62 };
+const EDGE_GRAB = { mouse: 0.3, finger: 0.52 };
+
 export class Layout {
   size = 60;
   originX = 0;
@@ -21,6 +40,8 @@ export class Layout {
   zoom = 1;
   panX = 0;
   panY = 0;
+  /** Whether a finger, rather than a mouse or pen, is driving the board. */
+  coarsePointer = false;
 
   constructor(private board: Board) {}
 
@@ -58,7 +79,7 @@ export class Layout {
 
   /** Nearest intersection within a grab radius, or null. */
   pickVertex(x: number, y: number, candidates?: Iterable<VertexId>): VertexId | null {
-    const limit = this.size * 0.42;
+    const limit = this.size * (this.coarsePointer ? VERTEX_GRAB.finger : VERTEX_GRAB.mouse);
     let best: VertexId | null = null;
     let bestDist = limit;
     for (const id of candidates ?? Object.keys(this.board.vertices)) {
@@ -74,7 +95,7 @@ export class Layout {
 
   /** Nearest edge within a grab radius, measured to the segment itself. */
   pickEdge(x: number, y: number, candidates?: Iterable<EdgeId>): EdgeId | null {
-    const limit = this.size * 0.3;
+    const limit = this.size * (this.coarsePointer ? EDGE_GRAB.finger : EDGE_GRAB.mouse);
     let best: EdgeId | null = null;
     let bestDist = limit;
     for (const id of candidates ?? Object.keys(this.board.edges)) {

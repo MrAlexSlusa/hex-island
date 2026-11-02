@@ -284,6 +284,9 @@ The suite covers the rules engine rather than the UI:
 - **ai** — full bot-only games at every difficulty mix (including a 5-seat
   table) played to a winner with no rule violations, Hard beating Easy over
   repeated games, and determinism for a given seed.
+- **layout** — the one piece of render code that is pure enough to test: the
+  grab radii, that a fingertip is forgiven a near-miss a cursor is not, and
+  that neither pointer can click the middle of a tile.
 
 ---
 
@@ -301,6 +304,20 @@ Pages via `.github/workflows/deploy-pages.yml`. Open that URL on a phone and the
 layout stacks: the sidebar drops below the board and the action bar goes
 single-column. The canvas takes touch input through pointer events, and
 `touch-action: none` keeps the browser from stealing a drag.
+
+A fingertip is blunter than a cursor, so while one is on the board the grab
+radius widens — corners from 0.42 to 0.62 of a hex circumradius, roads from
+0.3 to 0.52 — and a tap gets 14px of travel rather than 6 before it reads as
+the start of a pan. This cannot misfire: every pick is handed the legal spots
+and returns the nearest, so the radius only decides how far off a tap may land
+before it is ignored, never which spot wins. Corners sit one circumradius
+apart and a tile's centre is a full radius from each of its corners, so even
+the wider radius cannot jump a corner or make the middle of a tile clickable.
+`tests/layout.test.ts` pins all of that down.
+
+Which radius applies follows the pointer actually in use (`event.pointerType`),
+not the device, so a hybrid machine switching between mouse and touchscreen
+mid-game gets the right one each time, and a pen counts as precise.
 
 Opening it in the browser is enough to play. To get a home-screen icon instead
 of a browser tab, use **Add to Home Screen** — Share menu on iOS Safari, the

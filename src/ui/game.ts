@@ -148,19 +148,34 @@ export class GameScreen {
     let downAt: { x: number; y: number } | null = null;
     let panning = false;
 
+    /**
+     * Widens the board's grab radius while a finger is on it. A pen is as
+     * precise as a mouse, and a hybrid machine can switch between the two
+     * mid-game, so this follows whichever pointer is actually in use rather
+     * than deciding once from the device.
+     */
+    const notePointer = (event: PointerEvent) => {
+      this.renderer.layout.coarsePointer = event.pointerType === 'touch';
+    };
+
     this.canvas.addEventListener('pointerdown', (event) => {
+      notePointer(event);
       downAt = { x: event.clientX, y: event.clientY };
       panning = false;
       this.canvas.setPointerCapture(event.pointerId);
     });
 
     this.canvas.addEventListener('pointermove', (event) => {
+      notePointer(event);
       const point = this.renderer.toCanvas(event.clientX, event.clientY);
 
       if (downAt) {
         const dx = event.clientX - downAt.x;
         const dy = event.clientY - downAt.y;
-        if (panning || Math.hypot(dx, dy) > 6) {
+        // A fingertip rolls a little on its way down, so a tap needs more
+        // room before it is read as the start of a pan.
+        const slop = event.pointerType === 'touch' ? 14 : 6;
+        if (panning || Math.hypot(dx, dy) > slop) {
           panning = true;
           this.renderer.layout.panX += event.movementX;
           this.renderer.layout.panY += event.movementY;
@@ -188,6 +203,7 @@ export class GameScreen {
     });
 
     this.canvas.addEventListener('pointerup', (event) => {
+      notePointer(event);
       this.canvas.releasePointerCapture(event.pointerId);
       const wasPan = panning;
       downAt = null;
